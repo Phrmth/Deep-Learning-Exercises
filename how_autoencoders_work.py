@@ -52,10 +52,7 @@ model.summary()
 
 model.fit(img_array, img_array, epochs = 1000, shuffle = True, verbose = False)
 
-pred = model.predict(img_array)
-imshow(pred)
-model.fit(img_array, img_array, epochs = 500, shuffle = True)
-
+# predicting on the same image array
 pred = model.predict(img_array)
 imshow(pred[0].reshape(256,256,3))
 
