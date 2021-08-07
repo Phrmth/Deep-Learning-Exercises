@@ -1,3 +1,5 @@
+# code from kaggle competition on query result relevance
+
 import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -93,4 +95,57 @@ clf.fit(traindata,y)
 preds = clf.predict(testdata)
 
 
+
+
+# -------------------------------- different approach
+
+
+from nltk.stem.snowball import SnowballStemmer
+stemmer = SnowballStemmer('english')
+
+def str_stemmer(s):
+    """
+    function to stem the words of a sentense passed
+    """
+    return " ".join([stemmer.stem(word) for word in s.lower().split()])
+
+def str_common_word(str1, str2):
+    """
+    function to find common set of words between two sentenses passed and returning the count
+    """
+    return sum(int(str2.find(word)>=0) for word in str1.split())
+
+
+# merging train and test, and mergeing another set of desc data for each product_id
+df_all = pd.concat((train, test), axis=0, ignore_index=True)
+df_all = pd.merge(df_all, desc, how='left', on='product_uid')
+
+# Feature extraction from our existing features 
+df_all['search_term'] = df_all['search_term'].map(lambda x:str_stemmer(x))
+df_all['product_title'] = df_all['product_title'].map(lambda x:str_stemmer(x))
+df_all['product_description'] = df_all['product_description'].map(lambda x:str_stemmer(x))
+df_all['len_of_query'] = df_all['search_term'].map(lambda x:len(x.split())).astype(np.int64)
+df_all['product_info'] = df_all['search_term']+"\t"+df_all['product_title']+"\t"+df_all['product_description']
+df_all['word_in_title'] = df_all['product_info'].map(lambda x:str_common_word(x.split('\t')[0],x.split('\t')[1]))
+df_all['word_in_description'] = df_all['product_info'].map(lambda x:str_common_word(x.split('\t')[0],x.split('\t')[2]))
+
+# Dropping the features not required 
+df_all = df_all.drop(['search_term','product_title','product_description','product_info'],axis=1)
+
+df_train = df_all.iloc[:len(train)]
+df_test = df_all.iloc[len(train):]
+id_test = df_test['id']
+
+y_train = df_train['relevance'].values
+X_train = df_train.drop(['id','relevance'],axis=1).values
+X_test = df_test.drop(['id','relevance'],axis=1).values
+
+
+from sklearn.ensemble import RandomForestRegressor, BaggingRegressor
+# Building our model on the product id and the engineered features
+
+rf = RandomForestRegressor(n_estimators=15, max_depth=6, random_state=0)
+clf = BaggingRegressor(rf, n_estimators=45, max_samples=0.1, random_state=25)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
 
